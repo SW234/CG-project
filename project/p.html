@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D PC 조립 시뮬레이터</title>
+    <script type="text/javascript" src="MV.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1300px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #38bdf8;
+        }
+
+        header p {
+            margin: 5px 0 0 0;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+            height: 720px;
+        }
+
+        /* 좌측 컨트롤 및 대시보드 패널 */
+        .control-panel {
+            flex: 1;
+            background-color: #1e293b;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #f1f5f9;
+            border-left: 4px solid #38bdf8;
+            padding-left: 8px;
+            margin-bottom: 5px;
+        }
+
+        .component-group {
+            background-color: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .component-group label {
+            font-size: 13px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .row-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        select {
+            flex: 1;
+            background-color: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid #475569;
+            padding: 8px;
+            border-radius: 6px;
+            outline: none;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        select:focus {
+            border-color: #38bdf8;
+        }
+
+        select:disabled {
+            background-color: #0f172a;
+            color: #64748b;
+            border-color: #1e293b;
+            cursor: not-allowed;
+        }
+
+        button {
+            background-color: #38bdf8;
+            color: #0f172a;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background-color: #0ea5e9;
+        }
+
+        button.remove-btn {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        button.remove-btn:hover {
+            background-color: #dc2626;
+        }
+
+        /* 대시보드 현황판 */
+        .dashboard {
+            background-color: #111827;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .dash-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+
+        .dash-item .val {
+            font-weight: bold;
+            color: #38bdf8;
+        }
+
+        .warning-box {
+            background-color: #7f1d1d;
+            border: 1px solid #f87171;
+            color: #fca5a5;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            display: none;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        /* 우측 WebGL2 3D 뷰어 */
+        .canvas-container {
+            flex: 2;
+            background-color: #020617;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .canvas-hint {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            background-color: rgba(15, 23, 42, 0.85);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #94a3b8;
+            pointer-events: none;
+            border: 1px solid #334155;
+        }
+    </style>
+
+    <script id="vertex-shader" type="x-shader/x-vertex">
+        #version 300 es
+        in vec4 aPosition;
+        in vec3 aNormal;
+        in vec3 aColor;
+
+        out vec4 vColor;
+
+        uniform mat4 uWorldMatrix;
+        uniform mat4 uViewMatrix;
+        uniform mat4 uProjectionMatrix;
+
+        void main() {
+            // 정면 light, 상단 입체 라이트 복합 연산 구조
+            vec3 lightDir1 = normalize(vec3(0.5, 1.0, 1.0));
+            vec3 lightDir2 = normalize(vec3(-0.3, 0.8, -0.5));
+            
+            vec3 transformedNormal = normalize(mat3(uWorldMatrix) * aNormal);
+            float shading = max(dot(transformedNormal, lightDir1), 0.0) * 0.7 
+                          + max(dot(transformedNormal, lightDir2), 0.0) * 0.3 
+                          + 0.25; // Ambient
+
+            gl_Position = uProjectionMatrix * uViewMatrix * uWorldMatrix * aPosition;
+            vColor = vec4(aColor * min(shading, 1.0), 1.0);
+        }
+    </script>
+
+    <script id="fragment-shader" type="x-shader/x-fragment">
+        #version 300 es
+        precision mediump float;
+        in vec4 vColor;
+        out vec4 fragColor;
+
+        void main() {
+            fragColor = vColor;
+        }
+    </script>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>3D PC 조립 시뮬레이터</h1>
+        <p>index.html 내부 Fallback 디테일 부품 형상 디자인 3D 모델링 구조를 100% 매핑한 최종 빌드입니다.</p>
+    </header>
+
+    <div class="main-content">
+        <div class="control-panel">
+            <div class="section-title">컴포넌트 빌드 관리</div>
+            
+            <div class="component-group">
+                <label>중앙처리장치 (CPU)</label>
+                <div class="row-controls">
+                    <select id="select-cpu">
+                        <option value="65">AMD Ryzen 5 7600 (65W)</option>
+                        <option value="125">Intel Core i7-14700K (125W)</option>
+                        <option value="253">Intel Core i9-14900K (253W)</option>
+                    </select>
+                    <button id="btn-cpu" onclick="toggleComponent('cpu')">장착</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <label>메인보드 (Motherboard)</label>
+                <div class="row-controls">
+                    <select id="select-mb">
+                        <option value="50">ASUS B650M-K (50W)</option>
+                        <option value="80">MSI MAG Z790 TOMAHAWK (80W)</option>
+                    </select>
+                    <button id="btn-mb" onclick="toggleComponent('mb')">장착</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <label>메모리 (RAM)</label>
+                <div class="row-controls">
+                    <select id="select-ram">
+                        <option value="15">Samsung DDR5 16GB x2 (15W)</option>
+                        <option value="30">G.SKILL DDR5 RGB 32GB x2 (30W)</option>
+                    </select>
+                    <button id="btn-ram" onclick="toggleComponent('ram')">장착</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <label>저장장치 (SSD)</label>
+                <div class="row-controls">
+                    <select id="select-ssd">
+                        <option value="10">SKhynix Gold P31 1TB (10W)</option>
+                        <option value="15">Samsung 990 PRO 2TB (15W)</option>
+                    </select>
+                    <button id="btn-ssd" onclick="toggleComponent('ssd')">장착</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <label>그래픽 카드 (GPU)</label>
+                <div class="row-controls">
+                    <select id="select-gpu">
+                        <option value="115">NVIDIA RTX 4060 (115W)</option>
+                        <option value="220">NVIDIA RTX 4070 Super (220W)</option>
+                        <option value="450">NVIDIA RTX 4090 (450W)</option>
+                    </select>
+                    <button id="btn-gpu" onclick="toggleComponent('gpu')">장착</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <label>파워 서플라이 용량 (PSU)</label>
+                <select id="select-psu" onchange="updatePSUCapacity()">
+                    <option value="500">500W 정격 파워</option>
+                    <option value="700" selected>700W 정격 파워</option>
+                    <option value="1000">1000W 플래티넘 파워</option>
+                </select>
+            </div>
+
+            <div class="section-title">실시간 전력 및 조립 현황</div>
+            <div class="dashboard">
+                <div class="dash-item">
+                    <span>조립 완성도:</span>
+                    <span id="build-progress" class="val">0 / 5 개 부품 구성 완료</span>
+                </div>
+                <div class="dash-item">
+                    <span>파워 서플라이 제한:</span>
+                    <span id="psu-val" class="val">700 W</span>
+                </div>
+                <div class="dash-item">
+                    <span>예상 소모 전력 합계:</span>
+                    <span id="power-val" class="val">0 W</span>
+                </div>
+                <div id="power-warning" class="warning-box">
+                    ⚠️ <b>정격 용량 초과 경고!</b> 시스템 전력이 파워 서플라이 한계치를 초과했습니다. 고용량 PSU로 변경하거나 부품 스펙을 낮추십시오.
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-container" id="canvas-container">
+            <canvas id="glCanvas"></canvas>
+            <div class="canvas-hint">🖱️ 마우스 왼쪽 드래그: 아크볼(Arcball) 카메라 시점 회전</div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    // --- index.html 부품 로직 매핑 구조 ---
+    const buildState = {
+        mb:  { installed: false, power: 0 },
+        cpu: { installed: false, power: 0 },
+        ram: { installed: false, power: 0 },
+        ssd: { installed: false, power: 0 },
+        gpu: { installed: false, power: 0 },
+        psu_max: 700
+    };
+
+    let gl;
+    let vertices = [];
+    let vertexCount = 0;
+
+    let worldMatrix, viewMatrix, projectionMatrix;
+    let worldMatLoc, viewMatLoc, projMatLoc;
+
+    let isDragging = false;
+    let yaw = 25;
+    let pitch = -15;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    // 아크볼 정점용 큐브 데이터 모델 설계
+    const cubeVertices = [
+        vec3(-0.5, -0.5, -0.5), vec3(0.5, -0.5, -0.5), vec3(0.5, 0.5, -0.5), vec3(-0.5, 0.5, -0.5),
+        vec3(-0.5, -0.5,  0.5), vec3(0.5, -0.5,  0.5), vec3(0.5, 0.5,  0.5), vec3(-0.5, 0.5,  0.5)
+    ];
+
+    const faceNormals = [
+        vec3(0.0, 0.0, -1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0),
+        vec3(0.0, -1.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(-1.0, 0.0, 0.0)
+    ];
+
+    // --- 인터랙션 로직 핸들러 ---
+    window.toggleComponent = function(type) {
+        const lowerType = type.toLowerCase();
+        const selectElement = document.getElementById(`select-${lowerType}`);
+        const buttonElement = document.getElementById(`btn-${lowerType}`);
+        
+        if (!selectElement || !buttonElement) return;
+        
+        if (!buildState[lowerType].installed) {
+            buildState[lowerType].installed = true;
+            buildState[lowerType].power = parseInt(selectElement.value);
+            buttonElement.innerText = "탈거";
+            buttonElement.classList.add("remove-btn");
+            selectElement.disabled = true;
+        } else {
+            buildState[lowerType].installed = false;
+            buildState[lowerType].power = 0;
+            buttonElement.innerText = "장착";
+            buttonElement.classList.remove("remove-btn");
+            selectElement.disabled = false;
+        }
+        
+        updateDashboard();
+        rebuildMeshBuffers();
+    };
+
+    window.updatePSUCapacity = function() {
+        const psuSelect = document.getElementById("select-psu");
+        if(psuSelect) {
+            buildState.psu_max = parseInt(psuSelect.value);
+            updateDashboard();
+        }
+    };
+
+    function updateDashboard() {
+        let totalPower = 0;
+        let installedComponentsCount = 0;
+
+        const keys = ['mb', 'cpu', 'ram', 'ssd', 'gpu'];
+        keys.forEach(key => {
+            if (buildState[key].installed) {
+                totalPower += buildState[key].power;
+                installedComponentsCount++;
+            }
+        });
+
+        const progressEl = document.getElementById("build-progress");
+        const psuValEl = document.getElementById("psu-val");
+        const powerValEl = document.getElementById("power-val");
+        const warningBox = document.getElementById("power-warning");
+
+        if (progressEl) progressEl.innerText = `${installedComponentsCount} / 5 개 부품 구성 완료`;
+        if (psuValEl) psuValEl.innerText = `${buildState.psu_max} W`;
+        
+        if (powerValEl) {
+            powerValEl.innerText = `${totalPower} W`;
+            if (totalPower > buildState.psu_max) {
+                powerValEl.style.color = "#f87171";
+                if (warningBox) warningBox.style.display = "block";
+            } else {
+                powerValEl.style.color = "#4ade80";
+                if (warningBox) warningBox.style.display = "none";
+            }
+        }
+    }
+
+    // --- WebGL 지오메트리 프리미티브 데이터 생성기 ---
+    function appendCube(scale, translation, color) {
+        function pushQuad(a, b, c, d, normal) {
+            const indices = [a, b, c, a, c, d];
+            for (let i = 0; i < indices.length; i++) {
+                let p = cubeVertices[indices[i]];
+                let transformedPos = vec4(
+                    p[0] * scale[0] + translation[0],
+                    p[1] * scale[1] + translation[1],
+                    p[2] * scale[2] + translation[2],
+                    1.0
+                );
+                vertices.push(transformedPos[0], transformedPos[1], transformedPos[2]);
+                vertices.push(normal[0], normal[1], normal[2]);
+                vertices.push(color[0], color[1], color[2]);
+                vertexCount++;
+            }
+        }
+        pushQuad(1, 0, 3, 2, faceNormals[0]);
+        pushQuad(2, 3, 7, 6, faceNormals[1]);
+        pushQuad(3, 0, 4, 7, faceNormals[2]);
+        pushQuad(6, 5, 1, 2, faceNormals[3]);
+        pushQuad(4, 5, 6, 7, faceNormals[4]);
+        pushQuad(5, 4, 0, 1, faceNormals[5]);
+    }
+    function pushVertex(pos, normal, color){
+    vertices.push(
+        pos[0], pos[1], pos[2],
+        normal[0], normal[1], normal[2],
+        color[0], color[1], color[2]
+    );
+    vertexCount++;
+}
+
+function appendCylinder(radius, height, center, color, segments = 16){
+
+    for(let i=0;i<segments;i++){
+
+        const a1=(i/segments)*Math.PI*2;
+        const a2=((i+1)/segments)*Math.PI*2;
+
+        const x1=Math.cos(a1)*radius;
+        const z1=Math.sin(a1)*radius;
+
+        const x2=Math.cos(a2)*radius;
+        const z2=Math.sin(a2)*radius;
+
+        const p1=[center[0]+x1,center[1]-height/2,center[2]+z1];
+        const p2=[center[0]+x2,center[1]-height/2,center[2]+z2];
+        const p3=[center[0]+x2,center[1]+height/2,center[2]+z2];
+        const p4=[center[0]+x1,center[1]+height/2,center[2]+z1];
+
+        const normal=[x1/radius,0,z1/radius];
+
+        pushVertex(p1,normal,color);
+        pushVertex(p2,normal,color);
+        pushVertex(p3,normal,color);
+
+        pushVertex(p1,normal,color);
+        pushVertex(p3,normal,color);
+        pushVertex(p4,normal,color);
+    }
+}
+const HARDWARE_SPEC = {
+    MB:  { size: [1.0, 1.0, 0.03], pos: [-0.08, 0.05, -0.35], color: [0.11, 0.15, 0.14] },
+    CPU: { size: [0.25, 0.06, 0.25], pos: [-0.30, 0.22, -0.33], color: [0.72, 0.72, 0.72] },
+    RAM: { size: [0.03, 0.5, 0.12], pos: [0.28, 0.22, -0.30], color: [0.12, 0.13, 0.15] },
+    SSD: { size: [0.08, 0.25, 0.02], pos: [0.10, -0.10, -0.33], color: [0.08, 0.16, 0.12] },
+    GPU: { size: [0.95, 0.16, 0.32], pos: [0, -0.18, -0.15], color: [0.14, 0.14, 0.18] },
+    PSU: { size: [0.35, 0.20, 0.40], pos: [-0.42, -0.45, -0.10], color: [0.15, 0.15, 0.18] }
+};
+    // --- [★핵심 기능] index.html의 Fallback 부품별 3D 모델 형상을 완벽히 복제이식한 버퍼 제어 파트 ---
+    function rebuildMeshBuffers() {
+        vertices = [];
+        vertexCount = 0;
+        //바닥
+        appendCube([8.0, 0.05, 8.0],[0, -0.85, 0],[0.12, 0.14, 0.18]);
+        
+        //본체 케이스 
+        // 상단 프레임
+        appendCube([1.6,0.02,0.02],[0,0.8,-0.2],[0.18,0.20,0.24]);
+
+        // 하단 프레임
+        appendCube([1.6,0.02,0.02],[0,-0.6,-0.2],[0.18,0.20,0.24]);
+
+        // 왼쪽 프레임
+        appendCube([0.02,1.6,0.02],[-0.6,0,-0.2],[0.18,0.20,0.24]);
+        
+        // 오른쪽 프레임
+        appendCube([0.02,1.6,0.02],[0.6,0,-0.2],[0.18,0.20,0.24]);
+        // 전면 상단
+        appendCube([1.6,0.02,0.02],[0,0.8,0.2],[0.18,0.20,0.24]);
+        // 전면 하단
+        appendCube([1.6,0.02,0.02],[0,-0.6,0.2],[0.18,0.20,0.24]);
+        // 전면 좌측
+        appendCube([0.02,1.6,0.02],[-0.6,0,0.2],[0.18,0.20,0.24]);
+        // 전면 우측
+        appendCube([0.02,1.6,0.02],[0.6,0,0.2],[0.18,0.20,0.24]);
+        appendCube([1.15,1.15,0.005],[0,0,0.19],[0.20,0.28,0.35]);
+        //본체 케이스 
+
+        // 내부 장착 가이드 월 베이스 플레이트
+        appendCube([1.46, 1.56, 0.02], [0.0, 0.0, -0.4], [0.05, 0.05, 0.07]);
+        // 후면 및 전면 팬 하우징 플레이트 형상화 구조
+        appendCube([0.25, 0.25, 0.04], [-0.55, 0.5, -0.3], [0.03, 0.03, 0.04]);
+        appendCube([0.25, 0.25, 0.04], [0.55, 0.2, -0.3], [0.03, 0.03, 0.04]);
+
+        // ----------------- [2] 메인보드 (Motherboard) 레이어 -----------------
+        if (buildState.mb.installed) {
+            // 메인보드 메인 PCB 기판 (진한 다크 그린/블랙)
+            const s = HARDWARE_SPEC.MB;
+            appendCube(s.size, s.pos, s.color);
+            // 전원부 메인 VRM 대형 알루미늄 방열판 1 (Top)
+            appendCube([0.4, 0.08, 0.08], [-0.2, 0.44, -0.32], [0.35, 0.38, 0.4]);
+            // 전원부 메인 VRM 대형 알루미늄 방열판 2 (Left)
+            appendCube([0.08, 0.35, 0.08], [-0.46, 0.25, -0.32], [0.35, 0.38, 0.4]);
+            // 칩셋 방열판 커버 구조
+            appendCube([0.22, 0.22, 0.05], [0.3, -0.25, -0.33], [0.25, 0.27, 0.3]);
+            // PCIe x16 그래픽카드 메인 확장 장착 슬롯 가이드
+            appendCube([0.8, 0.04, 0.04], [-0.05, -0.1, -0.33], [0.04, 0.04, 0.05]);
+            for(let i=0;i<8;i++){
+                appendCube([0.55,0.005,0.005], [-0.15,0.38-(i*0.10),-0.31], [0.15,0.8,0.55]);
+                appendCube([0.005,0.08,0.005], [0.10,0.38-(i*0.10),-0.31], [0.15,0.8,0.55]);
+            }
+        }
+
+        //CPU
+        if(buildState.cpu.installed){
+        const spec = HARDWARE_SPEC.CPU;
+        appendCube(spec.size, spec.pos, spec.color);
+        appendCube([0.18, 0.02, 0.18], [-0.30, 0.26, -0.33], [0.85, 0.45, 0.15]);
+
+    for(let x=-0.20; x<=0.20; x+=0.10){
+        for(let z=-0.20; z<=0.20; z+=0.10){
+            appendCylinder(0.01, 0.04, [-0.30+x*0.25, 0.18, -0.33+z*0.25], [0.95,0.82,0.15]);
+        }
+    }
+}
+        //ram
+        if(buildState.ram.installed){
+    for(let i=0; i<2; i++){
+        for (let i = 0; i < 2; i++) {
+            let x = 0.28 + i * 0.10;
+            appendCube(HARDWARE_SPEC.RAM.size, [x, 0.22, -0.30], HARDWARE_SPEC.RAM.color);
+        }
+    }
+}
+        //SSD 레이어 
+        if (buildState.ssd.installed) {
+            // M.2 수평 장착 베이스 및 기판 본체 (메인보드 우하단 영역 매핑)
+            appendCube(HARDWARE_SPEC.SSD.size, HARDWARE_SPEC.SSD.pos, HARDWARE_SPEC.SSD.color);
+            // NVMe 컨트롤러 칩셋 및 플래시 메모리 다이 컴포넌트 덩어리
+            appendCube([0.06, 0.06, 0.025],[0.10,-0.02,-0.33], [0.15, 0.15, 0.16]);
+            appendCube([0.06, 0.12, 0.025],[0.10, -0.16, -0.33], [0.1, 0.1, 0.11]);
+            appendCylinder(0.015,0.01, [0.17, 0.02, -0.30], [0.85,0.85,0.85]);
+        }
+
+        //GPU
+        if (buildState.gpu.installed) {
+            // GPU 외부를 감싸는 슈라우드 아머 본체 프레임 무대 조절 (강렬한 사이버 퍼플 가이드)
+            appendCube(HARDWARE_SPEC.GPU.size, HARDWARE_SPEC.GPU.pos, HARDWARE_SPEC.GPU.color);
+            // 내부 히트싱크 알루미늄 핀 레이어 베이스 표현
+            appendCube([0.9, 0.14, 0.26], [-0.05,-0.18,-0.17], [0.45, 0.48, 0.5]);
+            appendCube([0.92, 0.03, 0.28], [-0.05,-0.18,-0.15], [0.32, 0.36, 0.42]);
+            // 전면 듀얼 쿨링팬 홀 디자인 1 (Left Fan)
+            appendCylinder(0.11, 0.03, [-0.25,-0.18,-0.01], [0.03,0.03,0.04]);
+            appendCube([0.18,0.01,0.03], [-0.25,-0.18,-0.01], [0.15,0.15,0.16]);
+            appendCube([0.03,0.01,0.18], [-0.25,-0.18,-0.01], [0.15,0.15,0.16]);
+            appendCube([0.18,0.01,0.03], [0.15,-0.18,-0.01], [0.15,0.15,0.16]);
+            appendCube([0.03,0.01,0.18], [0.15,-0.18,-0.01], [0.15,0.15,0.16]);
+            appendCylinder(0.11, 0.03, [0.15,-0.18,-0.01], [0.03,0.03,0.04]);
+            // 사이드 RGB 시그니처 엣지 바 포인트 line
+            appendCube([0.7, 0.015, 0.02], [-0.05, -0.10, -0.01], [0.65, 0.25, 0.85]);
+        }
+        if(buildState.mb.installed){
+            appendCube(HARDWARE_SPEC.PSU.size, HARDWARE_SPEC.PSU.pos, HARDWARE_SPEC.PSU.color);
+            // 파워서플라이
+            appendCube([0.35, 0.20, 0.40], [-0.42,-0.45,-0.10], [0.15, 0.15, 0.18]);
+            appendCylinder(0.10, 0.03, [-0.42,-0.45,-0.10], [0.05,0.05,0.06]);
+            appendCube([0.16,0.01,0.03],[-0.42,-0.45,-0.10],[0.12,0.12,0.13]);
+            appendCube([0.03,0.01,0.16],[-0.42,-0.45,-0.10],[0.12,0.12,0.13]);
+            for(let i=0;i<4;i++){
+            appendCube([0.02,0.02,0.25],[-0.25,-0.55+(i*0.04),-0.25+(i*0.04)],[0.02,0.02,0.03]);
+    }
+        }
+        // --- GPU 하드웨어 가속 컨텍스트 VRAM 파이프라인 데이터 바인딩 갱신 ---
+        const vBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+        const FSIZE = Float32Array.BYTES_PER_ELEMENT;
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, FSIZE * 9, 0);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, FSIZE * 9, FSIZE * 3);
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(2, 3, gl.FLOAT, false, FSIZE * 9, FSIZE * 6);
+        gl.enableVertexAttribArray(2);
+    }
+
+    // --- WebGL 셰이더 컴파일러 내부 코어 ---
+    function initShadersBuiltIn(gl, vertexShaderId, fragmentShaderId) {
+        const vertElem = document.getElementById(vertexShaderId);
+        const fragElem = document.getElementById(fragmentShaderId);
+
+        const vertShdr = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertShdr, vertElem.text.trim());
+        gl.compileShader(vertShdr);
+        if (!gl.getShaderParameter(vertShdr, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(vertShdr));
+            return -1;
+        }
+
+        const fragShdr = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragShdr, fragElem.text.trim());
+        gl.compileShader(fragShdr);
+        if (!gl.getShaderParameter(fragShdr, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(fragShdr));
+            return -1;
+        }
+
+        const program = gl.createProgram();
+        gl.attachShader(program, vertShdr);
+        gl.attachShader(program, fragShdr);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            return -1;
+        }
+        return program;
+    }
+
+    // --- 아크볼 회전 좌표 매핑 파서 ---
+    
+    function init() {
+        const canvas = document.getElementById('glCanvas');
+        const container = document.getElementById('canvas-container');
+        
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+
+        gl = canvas.getContext('webgl2', { antialias: true });
+        if (!gl) {
+            alert("WebGL2가 지원되지 않는 브라우저 환경입니다.");
+            return;
+        }
+
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0.01, 0.03, 0.08, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+
+        const program = initShadersBuiltIn(gl, "vertex-shader", "fragment-shader");
+        gl.useProgram(program);
+
+        worldMatLoc = gl.getUniformLocation(program, "uWorldMatrix");
+        viewMatLoc = gl.getUniformLocation(program, "uViewMatrix");
+        projMatLoc = gl.getUniformLocation(program, "uProjectionMatrix");
+
+        // 부품들의 디테일 형상을 시각적으로 잘 관찰할 수 있도록 쿼터 카메라 뷰포트 배치
+        viewMatrix = lookAt(vec3(0, 1.8, 7), vec3(0, 0, -0.1), vec3(0, 1, 0));
+        projectionMatrix = perspective(45, canvas.width / canvas.height, 0.1, 20.0);
+
+        gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
+        gl.uniformMatrix4fv(projMatLoc, false, flatten(projectionMatrix));
+
+        // 아크볼 회전 마우스 인풋 바인딩
+        canvas.addEventListener("mousedown", function(e) {
+            isDragging = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+});
+
+
+        canvas.addEventListener("mouseup", () => isDragging = false);
+        canvas.addEventListener("mouseleave", () => isDragging = false);
+        canvas.addEventListener("mousemove", function(e) {
+            if(!isDragging) return;
+            const dx = e.clientX - lastMouseX;
+            const dy = e.clientY - lastMouseY;
+            yaw -= dx * 0.4;
+            pitch -= dy * 0.25;
+            if(pitch > 30) pitch = 30;
+            if(pitch < -60) pitch = -60;
+
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            
+        });
+
+        window.addEventListener("resize", function() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            projectionMatrix = perspective(45, canvas.width / canvas.height, 0.1, 20.0);
+            gl.uniformMatrix4fv(projMatLoc, false, flatten(projectionMatrix));
+        });
+
+        rebuildMeshBuffers();
+        updateDashboard();
+        render();
+    }
+
+function render(){
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    worldMatrix = mat4();
+    const radius = 7.0;
+    const camX = radius * Math.sin(radians(yaw)) *Math.cos(radians(pitch));
+    const camY = radius * Math.sin(radians(-pitch));
+    const camZ =radius *Math.cos(radians(yaw)) * Math.cos(radians(pitch));
+
+    viewMatrix = lookAt(vec3(camX, Math.max(camY + 1.0, 0.5), camZ),vec3(0,-0.15,-0.15),vec3(0,1,0));
+    gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+    gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
+
+    if(vertexCount > 0){
+        gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
+    }
+
+    requestAnimationFrame(render);
+}
+    init();
+</script>
+</body>
+</html>
