@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PC 조립 시뮬레이터</title>
+    <script type="text/javascript" src="MV.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1300px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #38bdf8;
+        }
+
+        header p {
+            margin: 5px 0 0 0;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+            height: 720px;
+        }
+
+        .control-panel {
+            flex: 1;
+            background-color: #1e293b;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #f1f5f9;
+            border-left: 4px solid #38bdf8;
+            padding-left: 8px;
+            margin-bottom: 5px;
+        }
+
+        .component-group {
+            background-color: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .component-group label {
+            font-size: 13px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .row-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        select {
+            flex: 1;
+            background-color: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid #475569;
+            padding: 8px;
+            border-radius: 6px;
+            outline: none;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        select:focus {
+            border-color: #38bdf8;
+        }
+
+        select:disabled {
+            background-color: #0f172a;
+            color: #64748b;
+            border-color: #1e293b;
+            cursor: not-allowed;
+        }
+
+        button {
+            background-color: #38bdf8;
+            color: #0f172a;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background-color: #0ea5e9;
+        }
+
+        button.remove-btn {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        button.remove-btn:hover {
+            background-color: #dc2626;
+        }
+
+        .dashboard {
+            background-color: #111827;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .dash-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+
+        .dash-item .val {
+            font-weight: bold;
+            color: #38bdf8;
+        }
+
+        .warning-box {
+            background-color: #7f1d1d;
+            border: 1px solid #f87171;
+            color: #fca5a5;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            display: none;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .canvas-container {
+            flex: 2;
+            background-color: #020617;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .canvas-hint {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            background-color: rgba(15, 23, 42, 0.85);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #94a3b8;
+            pointer-events: none;
+            border: 1px solid #334155;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>PC 조립 시뮬레이터</h1>
+        <p>장착버튼을 눌러 부품을 장착시키고 여러분들만의 컴퓨터를 설계해보세요</p>
+    </header>
+
+    <div class="main-content">
+        <div class="control-panel">
+            <div class="section-title">컴포넌트 빌드 관리</div>
+            
+            <div class="component-group">
+                <label>중앙처리장치 (CPU)</label>
+                <div class="row-controls">
+                    <select id="select-cpu">
+                        <option value="65" data-id="ryzen7600">AMD Ryzen 5 7600 (65W)</option>
+                        <option value="125" data-id="i7-14700k">Intel Core i7-14700K (125W)</option>
+                        <option value="253" data-id="i9-14900k">Intel Core i9-14900K (253W)</option>
+                    </select>
+                    <button id="btn-cpu" onclick="toggleComponent('cpu')">장착</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <label>메인보드 (Motherboard)</label>
+                <div class="row-controls">
+                    <select id="select-mb">
+                        <option value="50">ASUS B650M-K (50W)</option>
+                        <option value="80">MSI MAG Z790 TOMAHAWK (80W)</option>
+                    </select>
+                    <button id="btn-mb" onclick="toggleComponent('mb')">장착</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <label>메모리 (RAM)</label>
+                <div class="row-controls">
+                    <select id="select-ram">
+                        <option value="15" data-id="corseir VENGEANCE RGB">Corsair VENGEANCE RGB (15W)</option>
+                        <option value="30" data-id="teamgroop T-Force White">Teamgroup T-Force White (30W)</option>
+                    </select>
+                    <button id="btn-ram" onclick="toggleComponent('ram')">장착</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <label>저장장치 (SSD)</label>
+                <div class="row-controls">
+                    <select id="select-ssd">
+                        <option value="10" data-id="samsung">Samsung SSD (10W)</option>
+                    </select>
+                    <button id="btn-ssd" onclick="toggleComponent('ssd')">장착</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <label>그래픽 카드 (GPU)</label>
+                <div class="row-controls">
+                    <select id="select-gpu">
+                        <option value="115" data-id="rtx4060">NVIDIA RTX 4060 (115W)</option>
+                        <option value="304" data-id="raderon9070">RADEON 9070XT (304W)</option>
+                        <option value="450" data-id="rtx4090">NVIDIA RTX 4090 (450W)</option>
+                    </select>
+                    <button id="btn-gpu" onclick="toggleComponent('gpu')">장착</button>
+                </div>
+            </div>
+
+            <div class="component-group">
+                <label>파워 서플라이 용량 (PSU)</label>
+                 <div class="row-controls">
+                <select id="select-psu">
+                    <option value="500">500W 정격 파워</option>
+                    <option value="700" selected>700W 정격 파워</option>
+                    <option value="1000">1000W 플래티넘 파워</option>
+                </select>
+                <button id="btn-psu" onclick="togglePSU()">장착</button>
+            </div>
+            </div>
+
+            <div class="section-title">실시간 전력 및 조립 현황</div>
+            <div class="dashboard">
+                <div class="dash-item">
+                    <span>부품 장착 현황:</span>
+                    <span id="build-progress" class="val">0 / 5 개 부품 구성 완료</span>
+                </div>
+                <div class="dash-item">
+                    <span>사용 가능한 최대 전력 :</span>
+                    <span id="psu-val" class="val">700 W</span>
+                </div>
+                <div class="dash-item">
+                    <span>예상 소모 전력 / 권장 전력:</span>
+                    <span id="power-val" class="val">0 W</span>
+                </div>
+                <div id="power-warning" class="warning-box">
+                    ⚠️ <b>정격 용량 초과 경고!</b> 시스템 전력이 파워 서플라이 한계치를 초과했습니다. 고용량 PSU로 변경하거나 전격이 낮은 부품으로 교체해주십시오
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-container" id="canvas-container">
+            <canvas id="glCanvas"></canvas>
+            <div class="canvas-hint">마우스를 드래그해 다양한 시점에서 컴퓨터를 둘러볼수 있습니다. 마우스 휠업/다운을 통해 확대,축소가 가능합니다.</div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    const vertexShaderSource = `#version 300 es
+    layout(location = 0) in vec3 aPosition;
+    layout(location = 1) in vec3 aNormal;
+    layout(location = 2) in vec3 aColor;
+    layout(location = 3) in vec2 aTexCoord;
+
+    out vec3 vNormal;
+    out vec3 vColor;
+    out vec2 vTexCoord;
+    out vec3 vPosition;
+
+    uniform mat4 worldMat;
+    uniform mat4 viewMat;
+    uniform mat4 projMat;
+
+    void main() {
+        vec4 worldPos = worldMat * vec4(aPosition, 1.0);
+        vPosition = worldPos.xyz;
+        vNormal = mat3(worldMat) * aNormal;
+        vColor = aColor;
+        vTexCoord = aTexCoord;
+        gl_Position = projMat * viewMat * worldPos;
+    }`;
+
+    const fragmentShaderSource = `#version 300 es
+    precision highp float;
+
+    in vec3 vNormal;
+    in vec3 vColor;
+    in vec2 vTexCoord;
+    in vec3 vPosition;
+
+    out vec4 fragColor;
+
+    uniform vec3 lightDir;
+    uniform vec3 eyePos;
+
+    uniform vec3 srcDiff;
+    uniform vec3 srcSpec;
+    uniform vec3 srcAmbi;
+
+    uniform vec3 matSpec;
+    uniform vec3 matAmbi;
+    uniform vec3 matEmit;
+    uniform float matSh;
+
+    uniform int uUseTexture;
+    uniform sampler2D uTextureSampler;
+
+    void main() {
+        vec3 N = normalize(vNormal);
+        vec3 L = normalize(lightDir);
+        vec3 V = normalize(eyePos - vPosition);
+        vec3 H = normalize(L + V);
+
+        vec3 baseColor = (uUseTexture == 1) ? texture(uTextureSampler, vTexCoord).rgb : vColor;
+
+        vec3 ambient = srcAmbi * matAmbi * baseColor;
+        vec3 diffuse = srcDiff * max(dot(N, L), 0.0) * baseColor;
+        vec3 specular = srcSpec * matSpec * pow(max(dot(N, H), 0.0), matSh);
+        
+        fragColor = vec4(ambient + diffuse + specular + matEmit, 1.0);
+    }`;
+
+    function createShaderProgram(gl, vertSrc, fragSrc) {
+        const vs = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vs, vertSrc);
+        gl.compileShader(vs);
+        if(!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
+            console.error("Vertex Shader 에러:", gl.getShaderInfoLog(vs));
+        }
+
+        const fs = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fs, fragSrc);
+        gl.compileShader(fs);
+        if(!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+            console.error("Fragment Shader 에러:", gl.getShaderInfoLog(fs));
+        }
+
+        const prog = gl.createProgram();
+        gl.attachShader(prog, vs);
+        gl.attachShader(prog, fs);
+        gl.linkProgram(prog);
+        if(!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+            console.error("Shader 링크 에러:", gl.getProgramInfoLog(prog));
+        }
+        return prog;
+    }
+
+    // 📂 각 모델의 경로 매핑 설정 (내부 파일명이 다를 경우 여기를 수정하세요)
+    const MODEL_CONFIGS = {
+        cpu: {
+            "ryzen7600": { obj: "assets/models/cpu/ryzen7600/source/Ryzen5/Ryzen5.obj", tex: "assets/models/cpu/ryzen7600/textures/amd_ryzen5_text.png", scale: 5.0, offset: [-0.25, 0.23, -0.30] },
+            "i7-14700k": { obj: "assets/models/cpu/i7-14700k/source/CPUi7.obj", tex: "assets/models/cpu/i7-14700k/textures/i7-14700k.png", scale: 0.00125, offset: [-0.25, 0.23, -0.30] },
+            "i9-14900k": { obj: "assets/models/cpu/i9-14900k/source/CPUi9.obj", tex: "assets/models/cpu/i9-14900k/textures/i9-14900k.png", scale: 0.00125, offset: [-0.25, 0.23, -0.30] }
+        },
+        gpu: {
+            "rtx4060": { obj: "assets/models/gpu/rtx4060/source/rtx4060.obj", tex: ["assets/models/gpu/rtx4060/textures/rtx4060_1.png",
+                "assets/models/gpu/rtx4060/textures/rtx4060_2.png",
+                "assets/models/gpu/rtx4060/textures/rtx4060_3.png",
+                "assets/models/gpu/rtx4060/textures/rtx4060_3.png"], scale: 1.0, offset: [0, -0.18, -0.15] },
+            "raderon9070": { obj: "assets/models/gpu/raderon9070/source/radeon_rx_9070_xt.obj", 
+                            tex: ["assets/models/gpu/raderon9070/textures/rx_9070xt_tex.png",
+                            "assets/models/gpu/raderon9070/textures/amd_radeon_tex.png",
+                            "assets/models/gpu/raderon9070/textures/stripe.png"], scale: 0.04, offset: [0, -0.18, -0.15] },
+            "rtx4090": { obj: "assets/models/gpu/rtx4090/source/rtx4090.obj", tex: "assets/models/gpu/rtx4090/textures/rtx4090_text.png", scale: 1.0, offset: [0, -0.18, -0.15] }
+        },
+        ram: {
+            "corseir VENGEANCE RGB": { obj: "assets/models/ram/corseir VENGEANCE RGB/source/ram.obj", tex: "assets/models/ram/corseir VENGEANCE RGB/textures/ram_text.png", scale: 1.0, offset: [0.28, 0.22, -0.30] },
+            "teamgroop T-Force White": { obj: "assets/models/ram/teamgroop T-Force White/source/ram.obj", tex: "assets/models/ram/teamgroop T-Force White/textures/ram_text.png", scale: 1.0, offset: [0.28, 0.22, -0.30] }
+        },
+        ssd: {
+            "samsung": { obj: "assets/models/ssd/samsung/source/ssd.obj", tex: "assets/models/ssd/samsung/textures/ssd_text.png", scale: 1.0, offset: [-0.05, -0.3, -0.33] }
+        }
+    };
+
+    const buildState = {
+        mb:  { installed: false, power: 0 },
+        cpu: { installed: false, power: 0, modelId: null, vertices: [], objLoaded: false, texture: null, textureLoaded: false },
+        ram: { installed: false, power: 0, modelId: null, vertices: [], objLoaded: false, texture: null, textureLoaded: false },
+        ssd: { installed: false, power: 0, modelId: null, vertices: [], objLoaded: false, texture: null, textureLoaded: false },
+        gpu: { installed: false, power: 0, modelId: null, vertices: [], objLoaded: false, texture: null, textureLoaded: false },
+        psu: { installed: false, watt: 0},
+        psu_max: 700
+    };
+
+    let gl;
+    let vertices = [];
+    let vertexCount = 0;
+    let worldMatrix, viewMatrix, projectionMatrix;
+    let worldMatLoc, viewMatLoc, projMatLoc;
+    let eyePosLoc;
+    let vBuffer = null;
+    let defaultTexture = null;
+
+    let isDragging = false;
+    let yaw = 25;
+    let pitch = -15;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    let cameraRadius = 7.0;
+    
+    let uUseTextureLoc;
+    let uTextureSamplerLoc;
+
+    const cubeVertices = [
+        vec3(-0.5, -0.5, -0.5), vec3(0.5, -0.5, -0.5), vec3(0.5, 0.5, -0.5), vec3(-0.5, 0.5, -0.5),
+        vec3(-0.5, -0.5,  0.5), vec3(0.5, -0.5,  0.5), vec3(0.5, 0.5,  0.5), vec3(-0.5, 0.5,  0.5)
+    ];
+
+    const faceNormals = [
+        vec3(0.0, 0.0, -1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0),
+        vec3(0.0, -1.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(-1.0, 0.0, 0.0)
+    ];
+
+    let drawCalls = [];
+
+    window.toggleComponent = function(type) {
+        const lowerType = type.toLowerCase();
+        const selectElement = document.getElementById(`select-${lowerType}`);
+        const buttonElement = document.getElementById(`btn-${lowerType}`);
+        
+        if (!selectElement || !buttonElement) return;
+        if (!buildState[lowerType].installed) {
+            buildState[lowerType].installed = true;
+            buildState[lowerType].power = parseInt(selectElement.value);
+            
+            // HTML option에서 data-id 속성 추출
+            const selectedOption = selectElement.options[selectElement.selectedIndex];
+            const modelId = selectedOption.getAttribute('data-id');
+            
+            selectElement.disabled = true;
+            buttonElement.innerText = "탈거";
+            buttonElement.classList.add("remove-btn");
+
+            if (modelId) {
+                loadModelForComponent(lowerType, modelId);
+            }
+        } else {
+            buildState[lowerType].installed = false;
+            buildState[lowerType].power = 0;
+            
+            // 데이터 초기화
+            if(buildState[lowerType].vertices) {
+                buildState[lowerType].objLoaded = false;
+                buildState[lowerType].textureLoaded = false;
+                buildState[lowerType].vertices = [];
+            }
+
+            selectElement.disabled = false;
+            buttonElement.innerText = "장착";
+            buttonElement.classList.remove("remove-btn");
+        }
+        updateDashboard();
+        rebuildMeshBuffers();
+    };
+
+    window.togglePSU = function(){
+        const select = document.getElementById("select-psu");
+        const button = document.getElementById("btn-psu");
+
+        if(!buildState.psu.installed){
+            buildState.psu.installed = true;
+            buildState.psu.watt = parseInt(select.value);
+            buildState.psu_max = buildState.psu.watt;
+            select.disabled = true;
+            button.innerText = "탈거";
+            button.classList.add("remove-btn");
+        } else {
+            buildState.psu.installed = false;
+            buildState.psu.watt = 0;
+            buildState.psu_max = 0;
+            select.disabled = false;
+            button.innerText = "장착";
+            button.classList.remove("remove-btn");
+        }
+        updateDashboard();
+        rebuildMeshBuffers();
+    };
+
+    function updateDashboard() {
+        let totalPower = 0;
+        let installedComponentsCount = 0;
+
+        const keys = ['mb', 'cpu', 'ram', 'ssd', 'gpu'];
+        keys.forEach(key => {
+            if (buildState[key].installed) {
+                totalPower += buildState[key].power;
+                installedComponentsCount++;
+            }
+        });
+
+        const progressEl = document.getElementById("build-progress");
+        const psuValEl = document.getElementById("psu-val");
+        const powerValEl = document.getElementById("power-val");
+        const warningBox = document.getElementById("power-warning");
+
+        if (progressEl) progressEl.innerText = `현재 ${installedComponentsCount} / 5개 부품 장착됨`;
+        if (psuValEl) psuValEl.innerText = buildState.psu.installed ? `${buildState.psu_max} W`: "미장착";
+        
+        if (powerValEl) {
+            const recommendedPower = Math.round(totalPower * 1.2);
+            powerValEl.innerText =`${totalPower} W / 권장 ${recommendedPower} W`;
+            if ( buildState.psu.installed && totalPower > buildState.psu_max) {
+                powerValEl.style.color = "#f87171";
+                if (warningBox) warningBox.style.display = "block";
+            } else {
+                powerValEl.style.color = "#4ade80";
+                if (warningBox) warningBox.style.display = "none";
+            }
+        }
+    }
+
+    function appendCube(scale, translation, color) {
+        let start = vertexCount;
+        function pushQuad(a, b, c, d, normal) {
+            const indices = [a, b, c, a, c, d];
+            for (let i = 0; i < indices.length; i++) {
+                let p = cubeVertices[indices[i]];
+                let transformedPos = vec4(
+                    p[0] * scale[0] + translation[0],
+                    p[1] * scale[1] + translation[1],
+                    p[2] * scale[2] + translation[2],
+                    1.0
+                );
+                vertices.push(transformedPos[0], transformedPos[1], transformedPos[2]);
+                vertices.push(normal[0], normal[1], normal[2]);
+                vertices.push(color[0], color[1], color[2]);
+                vertices.push(0.0, 0.0); 
+                vertexCount++;
+            }
+        }
+        pushQuad(1, 0, 3, 2, faceNormals[0]);
+        pushQuad(2, 3, 7, 6, faceNormals[1]);
+        pushQuad(3, 0, 4, 7, faceNormals[2]);
+        pushQuad(6, 5, 1, 2, faceNormals[3]);
+        pushQuad(4, 5, 6, 7, faceNormals[4]);
+        pushQuad(5, 4, 0, 1, faceNormals[5]);
+
+        return { start: start, count: vertexCount - start, useTexture: 0, textureObj: null };
+    }
+
+    function pushVertex(pos, normal, color){
+        vertices.push(
+            pos[0], pos[1], pos[2],
+            normal[0], normal[1], normal[2],
+            color[0], color[1], color[2],
+            0.0, 0.0
+        );
+        vertexCount++;
+    }
+
+    function appendCylinder(radius, height, center, color, segments = 16){
+        let start = vertexCount;
+        for(let i=0;i<segments;i++){
+            const a1=(i/segments)*Math.PI*2;
+            const a2=((i+1)/segments)*Math.PI*2;
+
+            const x1=Math.cos(a1)*radius;
+            const z1=Math.sin(a1)*radius;
+            const x2=Math.cos(a2)*radius;
+            const z2=Math.sin(a2)*radius;
+
+            const p1=[center[0]+x1,center[1]-height/2,center[2]+z1];
+            const p2=[center[0]+x2,center[1]-height/2,center[2]+z2];
+            const p3=[center[0]+x2,center[1]+height/2,center[2]+z2];
+            const p4=[center[0]+x1,center[1]+height/2,center[2]+z1];
+
+            const normal=[x1/radius,0,z1/radius];
+
+            pushVertex(p1,normal,color);
+            pushVertex(p2,normal,color);
+            pushVertex(p3,normal,color);
+
+            pushVertex(p1,normal,color);
+            pushVertex(p3,normal,color);
+            pushVertex(p4,normal,color);
+        }
+        return { start: start, count: vertexCount - start, useTexture: 0, textureObj: null };
+    }
+
+    // 🌐 공용 모델 비동기 로더 함수
+    async function loadModelForComponent(type, modelId) {
+        if (!MODEL_CONFIGS[type] || !MODEL_CONFIGS[type][modelId]) return;
+        const config = MODEL_CONFIGS[type][modelId];
+        
+        buildState[type].modelId = modelId;
+        buildState[type].objLoaded = false;
+        buildState[type].textureLoaded = false;
+
+        // 1. OBJ 파싱 및 로드
+        try {
+            const response = await fetch(config.obj);
+            if (!response.ok) throw new Error("파일을 찾을 수 없습니다.");
+            const text = await response.text();
+            buildState[type].vertices = parseOBJText(text);
+            buildState[type].objLoaded = true;
+            rebuildMeshBuffers();
+            console.log(`${type.toUpperCase()} [${modelId}] OBJ 로드 완료`);
+        } catch (err) {
+            console.warn(`${type} OBJ 로드 실패 (기본 박스로 대체됨):`, err.message);
+            buildState[type].objLoaded = false;
+        }
+
+        // 2. 개별 텍스처 이미지 로드
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([150, 150, 150, 255]));
+
+        const image = new Image();
+        image.onload = function() {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            
+            buildState[type].texture = texture;
+            buildState[type].textureLoaded = true;
+            rebuildMeshBuffers();
+        };
+        image.onerror = function() {
+            console.error(`${type} 텍스처 로드 실패: ` + config.tex);
+            buildState[type].texture = defaultTexture; // 실패 시 회색 텍스처 처리
+            buildState[type].textureLoaded = true;
+            rebuildMeshBuffers();
+        };
+        image.src = config.tex;
+    }
+
+    // 📐 범용 OBJ 텍스트 파서
+    function parseOBJText(text) {
+        const positions = [];
+        const normals = [];
+        const texCoords = [];
+        const resultVertices = [];
+
+        const lines = text.split("\n");
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('#') || trimmed === "") continue;
+
+            const parts = trimmed.split(/\s+/);
+            if (parts[0] === "v") {
+                positions.push([parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])]);
+            }
+            else if (parts[0] === "vt") {
+                texCoords.push([parseFloat(parts[1]), parseFloat(parts[2])]);
+            }
+            else if (parts[0] === "vn") {
+                normals.push([parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])]);
+            }
+            else if (parts[0] === "f") {
+                for (let i = 1; i < parts.length - 2; i++) {
+                    const idxs = [1, i + 1, i + 2];
+                    for (const idxPos of idxs) {
+                        const faceToken = parts[idxPos].split("/");
+                        
+                        const vIdx = parseInt(faceToken[0]) - 1;
+                        const v = positions[vIdx] || [0, 0, 0];
+
+                        let vt = [0.0, 0.0];
+                        if (faceToken.length > 1 && faceToken[1] !== "") {
+                            const vtIdx = parseInt(faceToken[1]) - 1;
+                            if (texCoords[vtIdx]) vt = texCoords[vtIdx];
+                        }
+
+                        let n = [0, 1, 0]; 
+                        if (faceToken.length === 3 && faceToken[2] !== "") {
+                            const nIdx = parseInt(faceToken[2]) - 1;
+                            if (normals[nIdx]) n = normals[nIdx];
+                        }
+
+                        resultVertices.push(
+                            v[0], v[2], v[1], 
+                            n[0], n[2], n[1], 
+                            1.0, 1.0, 1.0,
+                            vt[0], vt[1]
+                        );
+                    }
+                }
+            }
+        }
+        return resultVertices;
+    }
+
+    const HARDWARE_SPEC = {
+        MB:  { size: [1.0, 1.0, 0.03], pos: [-0.08, 0.05, -0.35], color: [0.11, 0.15, 0.14] },
+        CPU: { size: [0.25, 0.25, 0.03], pos: [-0.25, 0.23, -0.32], color: [0.72, 0.72, 0.72] },
+        RAM: { size: [0.03, 0.5, 0.12], pos: [0.28, 0.22, -0.30], color: [0.12, 0.13, 0.15] },
+        SSD: { size: [0.45, 0.1, 0.02], pos: [-0.05, -0.3, -0.33], color: [0.08, 0.16, 0.12] },
+        GPU: { size: [0.95, 0.16, 0.32], pos: [0, -0.18, -0.15], color: [0.14, 0.14, 0.18] },
+        PSU: { size: [0.35, 0.20, 0.40], pos: [-0.42, -0.45, -0.10], color: [0.15, 0.15, 0.18] }
+    };
+
+    // 🔨 로드된 3D 외부 모델 데이터를 통합 버퍼에 추가하는 헬퍼 함수
+    function appendLoadedModel(type, extraOffset = [0, 0, 0]) {
+        const state = buildState[type];
+        const config = MODEL_CONFIGS[type][state.modelId];
+        let start = vertexCount;
+        const scale = config.scale || 1.0;
+        const baseOffset = config.offset || [0, 0, 0];
+        
+        for(let i=0; i < state.vertices.length; i+=11){
+            vertices.push(
+                state.vertices[i+0] * scale + baseOffset[0] + extraOffset[0],
+                state.vertices[i+1] * scale + baseOffset[1] + extraOffset[1],
+                state.vertices[i+2] * scale + baseOffset[2] + extraOffset[2],
+                
+                state.vertices[i+3], state.vertices[i+4], state.vertices[i+5],
+                state.vertices[i+6], state.vertices[i+7], state.vertices[i+8],
+                state.vertices[i+9], state.vertices[i+10]
+            );
+            vertexCount++;
+        }
+        return { start: start, count: vertexCount - start, useTexture: state.textureLoaded ? 1 : 0, textureObj: state.texture };
+    }
+
+    function rebuildMeshBuffers() {
+        vertices = [];
+        vertexCount = 0;
+        drawCalls = [];
+        
+        // 본체 기초 케이스 프레임 구조물들
+        drawCalls.push(appendCube([8.0, 0.05, 8.0],[0, -0.85, 0],[0, 0.7, 0.64]));
+        drawCalls.push(appendCube([1.46, 1.56, 0.02], [0.0, 0.0, -0.4], [0.39, 0.51, 0.52]));
+        drawCalls.push(appendCube([1.46, 0.02, 1.8], [0.0, -0.77, 0.48], [0.39, 0.51, 0.52]));
+        
+        // 1. 메인보드 조립
+        if (buildState.mb.installed) {
+            const s = HARDWARE_SPEC.MB;
+            drawCalls.push(appendCube(s.size, s.pos, s.color));
+            drawCalls.push(appendCube([0.22, 0.22, 0.05], [0.3, -0.25, -0.33], [0.25, 0.27, 0.3]));
+            drawCalls.push(appendCube([0.8, 0.04, 0.04], [-0.05, -0.1, -0.33], [0.04, 0.04, 0.05]));
+            for(let i=0;i<8;i++){
+                drawCalls.push(appendCube([0.55,0.005,0.005], [-0.15,0.38-(i*0.10),-0.31], [0.15,0.8,0.55]));
+                drawCalls.push(appendCube([0.005,0.08,0.005], [0.10,0.38-(i*0.10),-0.31], [0.15,0.8,0.55]));
+            }
+        }
+
+        // 2. CPU 조립 (동적 OBJ 분기 처리)
+        if(buildState.cpu.installed){
+            if(buildState.cpu.objLoaded){
+                drawCalls.push(appendLoadedModel('cpu'));
+            } else {
+                const spec = HARDWARE_SPEC.CPU;
+                drawCalls.push(appendCube(spec.size, spec.pos, spec.color));
+                drawCalls.push(appendCube([0.18, 0.22, 0.02], [-0.25, 0.23, -0.29], [0.85, 0.45, 0.15]));
+            }
+        }
+        
+        // 3. RAM 조립 (동적 OBJ 분기 처리 및 2개 슬롯 배치)
+        if(buildState.ram.installed){
+            if(buildState.ram.objLoaded){
+                drawCalls.push(appendLoadedModel('ram', [0, 0, 0]));
+                drawCalls.push(appendLoadedModel('ram', [0.10, 0, 0])); // 듀얼 채널 슬롯 간격 추가
+            } else {
+                for(let i=0; i<2; i++){
+                    let x = 0.28 + i * 0.10;
+                    drawCalls.push(appendCube(HARDWARE_SPEC.RAM.size, [x, 0.22, -0.30], HARDWARE_SPEC.RAM.color));
+                }
+            }
+        }
+        
+        // 4. 저장장치 SSD 조립
+        if (buildState.ssd.installed) {
+            if(buildState.ssd.objLoaded){
+                drawCalls.push(appendLoadedModel('ssd'));
+            } else {
+                drawCalls.push(appendCube(HARDWARE_SPEC.SSD.size, HARDWARE_SPEC.SSD.pos, HARDWARE_SPEC.SSD.color));
+                drawCalls.push(appendCube([0.06, 0.06, 0.025],[0.1, -0.3, -0.33], [0.15, 0.15, 0.16]));
+                drawCalls.push(appendCube([0.06, 0.12, 0.025],[-0.15, -0.3, -0.33], [0.1, 0.1, 0.11]));
+                drawCalls.push(appendCylinder(0.015,0.01, [-0.05, -0.3, -0.33], [0.85,0.85,0.85]));
+            }
+        }
+
+        // 5. 그래픽카드 GPU 조립
+        if (buildState.gpu.installed) {
+            if(buildState.gpu.objLoaded){
+                drawCalls.push(appendLoadedModel('gpu'));
+            } else {
+                drawCalls.push(appendCube(HARDWARE_SPEC.GPU.size, HARDWARE_SPEC.GPU.pos, HARDWARE_SPEC.GPU.color));
+                drawCalls.push(appendCube([0.9, 0.14, 0.26], [-0.05,-0.18,-0.17], [0.45, 0.48, 0.5]));
+                drawCalls.push(appendCube([0.92, 0.03, 0.28], [-0.05,-0.18,-0.15], [0.32, 0.36, 0.42]));
+                drawCalls.push(appendCylinder(0.11, 0.03, [-0.25,-0.23,-0.07], [0.03,0.03,0.04]));
+                drawCalls.push(appendCube([0.18,0.01,0.03], [-0.25,-0.23,-0.07], [0.15,0.15,0.16]));
+                drawCalls.push(appendCube([0.03,0.01,0.18], [-0.25,-0.23,-0.07], [0.15,0.15,0.16]));
+                drawCalls.push(appendCube([0.18,0.01,0.03], [0.15,-0.23,-0.07], [0.15,0.15,0.16]));
+                drawCalls.push(appendCube([0.03,0.01,0.18], [0.15,-0.23,-0.07], [0.15,0.15,0.16]));
+                drawCalls.push(appendCylinder(0.11, 0.03, [0.15,-0.23,-0.07], [0.03,0.03,0.04]));
+                drawCalls.push(appendCube([0.7, 0.015, 0.02], [-0.05, -0.10, -0.01], [0.65, 0.25, 0.85]));
+            }
+        }
+
+        // 6. 파워 서플라이 PSU 조립
+        if (buildState.psu.installed) {
+            drawCalls.push(appendCube(HARDWARE_SPEC.PSU.size, HARDWARE_SPEC.PSU.pos, HARDWARE_SPEC.PSU.color));
+            drawCalls.push(appendCylinder(0.10, 0.03, [-0.42,-0.45,-0.10], [0.05,0.05,0.06]));
+            drawCalls.push(appendCube([0.16,0.01,0.03],[-0.42,-0.45,-0.10],[0.12,0.12,0.13]));
+            drawCalls.push(appendCube([0.03,0.01,0.16],[-0.42,-0.45,-0.10],[0.12,0.12,0.13]));
+            for(let i=0;i<4;i++){
+                drawCalls.push(appendCube([0.02,0.02,0.25],[-0.25,-0.55+(i*0.04),-0.25+(i*0.04)],[0.02,0.02,0.03]));
+            }
+        }
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, vBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+        const FSIZE = Float32Array.BYTES_PER_ELEMENT;
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, FSIZE * 11, 0);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, FSIZE * 11, FSIZE * 3);
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(2, 3, gl.FLOAT, false, FSIZE * 11, FSIZE * 6);
+        gl.enableVertexAttribArray(2);
+        gl.vertexAttribPointer(3, 2, gl.FLOAT, false, FSIZE * 11, FSIZE * 9);
+        gl.enableVertexAttribArray(3);
+    }
+
+    function init() {
+        const canvas = document.getElementById('glCanvas');
+        const container = document.getElementById('canvas-container');
+        
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+
+        gl = canvas.getContext('webgl2', { antialias: true });
+        if (!gl) {
+            alert("WebGL2가 지원되지 않는 브라우저 환경입니다.");
+            return;
+        }
+
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0.01, 0.03, 0.08, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+        vBuffer = gl.createBuffer();
+
+        // 공용 기본 텍스처 (1x1 흰색 기본 이미지 생성)
+        defaultTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, defaultTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+
+        const program = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
+        const lightDirLoc = gl.getUniformLocation(program, "lightDir");
+
+        gl.useProgram(program);
+        gl.uniform3f(lightDirLoc, 0.4, 1.0, 0.3);
+
+        const srcDiffLoc = gl.getUniformLocation(program, "srcDiff");
+        const srcSpecLoc = gl.getUniformLocation(program, "srcSpec");
+        const srcAmbiLoc = gl.getUniformLocation(program, "srcAmbi");
+
+        const matSpecLoc = gl.getUniformLocation(program, "matSpec");
+        const matAmbiLoc = gl.getUniformLocation(program, "matAmbi");
+        const matEmitLoc = gl.getUniformLocation(program, "matEmit");
+        const matShLoc = gl.getUniformLocation(program, "matSh");
+
+        gl.uniform3f(srcDiffLoc, 1.0, 1.0, 1.0);
+        gl.uniform3f(srcSpecLoc, 1.0, 1.0, 1.0);
+        gl.uniform3f(srcAmbiLoc, 0.25, 0.25, 0.25);
+
+        gl.uniform3f(matSpecLoc, 0.8, 0.8, 0.8);
+        gl.uniform3f(matAmbiLoc, 0.3, 0.3, 0.3);
+        gl.uniform3f(matEmitLoc, 0.0, 0.0, 0.0);
+        gl.uniform1f(matShLoc, 64.0);
+
+        worldMatLoc = gl.getUniformLocation(program, "worldMat");
+        viewMatLoc = gl.getUniformLocation(program, "viewMat");
+        projMatLoc = gl.getUniformLocation(program, "projMat");
+        eyePosLoc = gl.getUniformLocation(program, "eyePos");
+        
+        uUseTextureLoc = gl.getUniformLocation(program, "uUseTexture");
+        uTextureSamplerLoc = gl.getUniformLocation(program, "uTextureSampler");
+
+        viewMatrix = lookAt(vec3(0, 1.8, 7), vec3(0, 0, -0.1), vec3(0, 1, 0));
+        projectionMatrix = perspective(45, canvas.width / canvas.height, 0.1, 20.0);
+
+        gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix));
+        gl.uniformMatrix4fv(projMatLoc, false, flatten(projectionMatrix));
+
+        canvas.addEventListener("mousedown", function(e) {
+            isDragging = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        canvas.addEventListener("mouseup", () => isDragging = false);
+        canvas.addEventListener("mouseleave", () => isDragging = false);
+        canvas.addEventListener("mousemove", function(e) {
+            if(!isDragging) return;
+            const dx = e.clientX - lastMouseX;
+            const dy = e.clientY - lastMouseY;
+            yaw -= dx * 0.4;
+            pitch -= dy * 0.25;
+            if(pitch > 30) pitch = 30;
+            if(pitch < -60) pitch = -60;
+
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        canvas.addEventListener("wheel", function(e){
+            e.preventDefault();
+            cameraRadius += e.deltaY * 0.01;
+            if(cameraRadius < 3.0) cameraRadius = 3.0;
+            if(cameraRadius > 15.0) cameraRadius = 15.0;
+        });
+
+        window.addEventListener("resize", function() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            projectionMatrix = perspective(45, canvas.width / canvas.height, 0.1, 20.0);
+            gl.uniformMatrix4fv(projMatLoc, false, flatten(projectionMatrix));
+        });
+
+        rebuildMeshBuffers();
+        updateDashboard();
+        render();
+    }
+
+    function render(){
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        worldMatrix = mat4();
+        const radius = cameraRadius;
+        const camX = radius * Math.sin(radians(yaw)) * Math.cos(radians(pitch));
+        const camY = radius * Math.sin(radians(-pitch));
+        const camZ = radius * Math.cos(radians(yaw)) * Math.cos(radians(pitch));
+        gl.uniform3f(eyePosLoc, camX, Math.max(camY + 1.0, 0.5), camZ);
+
+        viewMatrix = lookAt(vec3(camX, Math.max(camY + 1.0, 0.5), camZ), vec3(0,-0.15,-0.15), vec3(0,1,0));
+        gl.uniformMatrix4fv(worldMatLoc, false, flatten(worldMatrix));
+        
+        // ✨ 마우스 카메라 멈춤 에러 해결 포인트! 매 프레임 변환된 viewMatrix를 셰이더로 정상 전송
+        gl.uniformMatrix4fv(viewMatLoc, false, flatten(viewMatrix)); 
+
+        if(vertexCount > 0){
+            gl.activeTexture(gl.TEXTURE0);
+            gl.uniform1i(uTextureSamplerLoc, 0);
+            
+            // 각 서브 드로우 콜 마다 개별 매핑된 텍스처를 바인딩하여 그리기
+            drawCalls.forEach(call => {
+                gl.uniform1i(uUseTextureLoc, call.useTexture);
+                if (call.useTexture === 1 && call.textureObj) {
+                    gl.bindTexture(gl.TEXTURE_2D, call.textureObj);
+                } else {
+                    gl.bindTexture(gl.TEXTURE_2D, defaultTexture);
+                }
+                gl.drawArrays(gl.TRIANGLES, call.start, call.count);
+            });
+        }
+
+        requestAnimationFrame(render);
+    }
+    init();
+</script>
+</body>
+</html>
